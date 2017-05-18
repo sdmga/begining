@@ -1,0 +1,1562 @@
+
+
+imageMode(CENTER);
+textFont(createFont('monospace'));
+
+var lag = true;
+
+var screen = 'menu';
+
+
+var keys = {};
+keyPressed = function() {keys[keyCode] = true;};
+keyReleased = function() {keys[keyCode] = false;};
+
+var mouseDown = false;
+mousePressed = function() {mouseDown = true;};
+mouseReleased = function() {mouseDown = false;};
+
+var button = function(x, y, txt, func) {
+    if (mouseX > x && mouseX < x + textWidth(txt) && mouseY > y - textAscent() - textDescent() && mouseY < y) {
+        text(txt, x, y);
+        text(">>>", x-textWidth(">>> "), y);
+        if (mouseDown) {
+            func();
+        }
+    } else {
+        text(txt, x, y);
+    }
+};
+
+var mouse = createGraphics(10, 10, P2D);
+mouse.strokeWeight(2);
+mouse.background(0, 0, 0, 0);
+mouse.stroke(255, 120, 0);
+mouse.noFill();
+mouse.arc(-2, 5, 8, 8, 1, 270);
+mouse.stroke(0, 153, 255);
+mouse.arc(12, 5, 8, 8, 1, 270);
+mouse.stroke(0);
+mouse.point(5, 5);
+
+var Aperture = createGraphics(400, 400, P2D);
+Aperture.angleMode = "degrees";
+Aperture.background(0, 0, 0, 0);
+Aperture.fill(0);
+Aperture.ellipse(200, 200, 300, 300);
+Aperture.fill(255);
+Aperture.ellipse(200, 200, 150, 150);
+Aperture.stroke(255);
+Aperture.strokeWeight(15);
+for (var i = 0; i < 360; i += 45) {
+    Aperture.pushMatrix();
+    Aperture.translate(200, 200);
+    Aperture.rotate(i);
+    Aperture.line(135, -65, 50, 47);
+    Aperture.popMatrix();
+}
+
+var chell = function(x, y, facing, w, h) {
+    stroke(0, 0, 0);
+    strokeWeight(2);
+    pushMatrix();
+    translate(x, y);
+    scale(w / 20, h / 20);
+    fill(235, 149, 0);
+    rect(0, 0, 20, 20, 2);
+    fill(235, 230, 181);
+    rect(0, 0, 20, 10, 2);
+    strokeWeight(4);
+    point(7 + facing*2, 5);
+    point(13 + facing*2,5);
+    popMatrix();
+};//from: https://www.khanacademy.org/computer-programming/chell/5161550565736448
+
+var mill = millis();
+var maxed = 0;
+var nextLevel = 0;
+var restart = false;
+
+var textWrap = function(txt, txtWidth) {
+    var allTxt = split(txt, " ");
+    var newTxt = "";
+    for (var i = 0; i < allTxt.length; i++){
+        if (textWidth(newTxt + " " + allTxt[i]) < txtWidth) {
+            if (i !== 0) {
+                newTxt += " " + allTxt[i];
+            } else {
+                newTxt += allTxt[i];
+            }
+        } else {
+            newTxt += "\n" + allTxt[i];
+        }
+    }
+    return newTxt;
+};
+
+var levels = [
+    
+    {map: [
+        "XXXXXXXXXX",
+        "X........X",
+        "X........X",
+        "X........X",
+        "X........X",
+        "X........X",
+        "X........X",
+        "X........X",
+        "X8......0X",
+        "XXXXXXXXXX"
+    ], text: "Do not be alarmed as you open your eyes this morning. You are in the training rooms of Aperture Science. Your job is to travel without harm to the elevator at the end of each room. This task may become more challenging than expected, but thanks to the new Aperture Science Handheld Portal Device (ASHPD) - the impossible is easy. Move to the right to continue training.", instruct: "[ARROWS] or [W][A][D] to move."},
+    {map: [
+        "XXXXXXXXXX",
+        "X........X",
+        "X........X",
+        "X........X",
+        "X.......0X",
+        "X....XXXXX",
+        "X....XXXXX",
+        "X....XXXXX",
+        "X8...XXXXX",
+        "XXXXXXXXXX"
+    ], text: "As you will learn, your portal device can shoot two\ndifferent portal holes - orange and blue. Once entered, you will appear at the other's location.", instruct: "Use [E] to open a Blue Portal, and [Q] to open an Orange Portal."},
+    {map: [
+        "XXXXXXXXXX",
+        "XXXX.....X",
+        "XXXX.....X",
+        "XXXX.....X",
+        "XXXX..X..X",
+        "XXXX..X..X",
+        "X.....X..X",
+        "X..X..X..X",
+        "X8.X..X.0X",
+        "XXXXXXXXXX"
+    ], text: "You may find these rooms challenge your current thinking ability. No worries. There is always room for more in the incinerator.", instruct: "[RIGHT] and [LEFT] click also fire portals."},
+    {map: [
+        "XXXXxxxXXX",
+        "X........X",
+        "X........X",
+        "x........X",
+        "x........X",
+        "X...xx...X",
+        "X...xx...X",
+        "x...xx...X",
+        "x8..xx..0X",
+        "XXXXXXXXXX"
+    ], text: "The dark walls seen here are different from the others. While they will not harm you, no portals can be fired onto the wall.", instruct: "Press [ENTER] to close."},
+    {map: [
+        "XXXxxxxXXX",
+        "XXX....XXX",
+        "XXX....XXX",
+        "XXX....XXX",
+        "XXX..X.XXX",
+        "xxX..X.XXX",
+        "x....X.xXX",
+        "x..XXX..0X",
+        "X8.XXX..xX",
+        "XXXXXXXXXX"
+    ], text: "There must be enough room for a portal to appear where you shoot it.", instruct: ""},
+    {map: [
+        "XXXXxxxxxx",
+        "X......x.x",
+        "X......x.x",
+        "X......x.x",
+        "X.......0x",
+        "X..X...XXX",
+        "X..X...XXX",
+        "X......XXX",
+        "X8.....XXX",
+        "XXXXXXXXXX"
+    ], text: "As you continue, gravity will be your best friend, but also a cruel enemy. Without it, you could not acquire the velocities to reach higher platforms. None the less, it will also enable you to fall back to the ground, possibly causing your death.", instruct: "[F] will shut both portals"},
+    {map: [
+        "XXXXXXXXXX",
+        "XXXXXXXXXX",
+        "XXxxxxxxxx",
+        "X1.......x",
+        "X8......0x",
+        "XXX...xxxx",
+        "XXX...xXXX",
+        "XXX...xXXX",
+        "XXX...xXXX",
+        "XXXXXxxXXX"
+    ], text: "Platforms such as that which you see above you, can only hold portals when they are fully extended. This will happen if you are close to the platform.", instruct: "[P] will restart the level"},
+    {map: [
+        "XXXXXXXXXX",
+        "XXXXxxxxxX",
+        "XXXx1...0x",
+        "XXXx...xxX",
+        "XXx1...xXX",
+        "XXx..xxXXX",
+        "Xx1..xXXXX",
+        "Xx..xXXXXX",
+        "X8..xXXXXX",
+        "XXXXXXXXXX"
+    ], text: "", instruct: ""},
+    {map: [
+        "XXXxxxxxxX",
+        "XXx......x",
+        "XXx......x",
+        "XXx.....0x",
+        "XXx..xxxxX",
+        "XXx..xXXXX",
+        "XXX..xXXXX",
+        "X....xXXXX",
+        "X8...xXXXX",
+        "XXXXXXXXXX"
+    ], text: "Sometimes, the amount of space needed in a level is not adequate to create enough momentum when exiting a portal to reach higher blocks. This is where one must start thinking out of the box.\n\nHINT: Infinite Loop", instruct: ""},
+    {map: [
+        "XXXXXXXXXX",
+        "X........X",
+        "X........X",
+        "X........X",
+        "X8......0X",
+        "XXX....XXX",
+        "XXX....XXX",
+        "XXX....XXX",
+        "XXX....XXX",
+        "XXX....XXX"
+    ], text: "Some of the required tasks may risk your personal health. No matter. We have other test subjects when you expire.", instruct: ""},
+    {map: [
+        "XXXXXXXXXX",
+        "X...XX...X",
+        "X...XX...X",
+        "X...XX...X",
+        "X...XX...X",
+        "X...XX...X",
+        "X...==...X",
+        "X...XX...X",
+        "X8..XX..0X",
+        "XXXXXXXXXX"
+    ], text: "Be cautious around the electrical field created between the electrical plates to your right. Wouldn't want anything to accidentally fall in between while they were turned on.", instruct: ""},
+    {map: [
+        "XXXxxXXXXXXXXXX",
+        "X....xXXXXXXXXX",
+        "X8...xxxXXXXXXX",
+        "XXX.....xxXXXxX",
+        "XXX...x...===0x",
+        "XXXXXXX..XXXXxX",
+        "X........XXXXXX",
+        "X........XXXXXX",
+        "X........XXXXXX",
+        "X........XXXXXX"
+    ], text: "Some rooms can stretch farther than you can see when you start.", instruct: ""},
+    {map: [
+        "XXXXXXXXXXXXXXX",
+        "X.............X",
+        "X.............X",
+        "XX.XX--XXXXXXXX",
+        "x...x.........X",
+        "x.X..XXXXXXX--X",
+        "x...x.........X",
+        "x...xXXXX--XXXX",
+        "XX--XXXXX.....X",
+        "X...|...X.....X",
+        "X...|...X.....X",
+        "XXXXX...X.....X",
+        "X...|...X.....X",
+        "X8..|...X....0X",
+        "XXXXXXXXXXXXXXX",
+    ], text: "Some walls are made up of energy fields which restrict any movement of materials larger than a baseball. This means you can not pass through, but your portal bullets can.", instruct: ""
+    },
+    {map: [
+        "xxxxxxxxxx",
+        "x...X....x",
+        "X........x",
+        "X........x",
+        "x........x",
+        "x.....x..x",
+        "x.....|..x",
+        "x.....|..x",
+        "x...X8|.0x",
+        "xXXxxxxxxx"
+    ], text: "So close, but so far.", instruct: ""},
+    {map: [
+        "XXXXXXXXXX",
+        "X...<....X",
+        "X--XX....X",
+        "X..XX....X",
+        "X..==.X.XX",
+        "X..XXXX.XX",
+        "X..|..X.XX",
+        "XXXX--X.0X",
+        "X8.|..X.XX",
+        "XXXXXXXXXX"
+    ], text: "Avoid turrets, as their bullets my deal you damage. Turrets can only shoot in front of themselves.", instruct: ""},
+    {map: [
+        "xxxxxxxxxxx",
+        "x.........x",
+        "x.....x..0x",
+        "x.....XXXXx",
+        "x.........x",
+        "x.....>...x",
+        "x...XXX...x",
+        "x.....Xxx-x",
+        "x...>.....x",
+        "X.8.XXXXXXx",
+        "XXXXXXXXXXX",
+    ], text: "Do you have what it takes?", instruct: "[S] or DOWN when next to a turret to pick up and release."},
+    {map: [
+        "XXXXXXXXXXX",
+        "X.........X",
+        "X.........X",
+        "X.......xxx",
+        "X.........x",
+        "X.8.......x",
+        "XXXX......x",
+        "XXXX......x",
+        "XXXX>>>..0x",
+        "XXXXXXXXXXX",
+    ], text: "Look before you leap.\n\nTurrets can pass through portals.", instruct: ""},
+    {map: [
+        "xxxxxxxxxx",
+        "x........x",
+        "x.......0x",
+        "x....XXXXX",
+        "X....X...X",
+        "X....B..bX",
+        "XXXXXX..XX",
+        "X....X..XX",
+        "X8a..A..XX",
+        "XXXXXXXXXX",
+    ], text: "Welcome to the world of buttons and doors. Each button matches a door of corresponding color scheme. Step onto a button to trigger it", instruct: ""},
+    {map: [
+        "XXXXXXxxxx",
+        "X8..XX...x",
+        "XX..XX...x",
+        "X..#XX...x",
+        "X--XXX...x",
+        "X...XX...x",
+        "X...XX...x",
+        "X...XX...x",
+        "Xa..A...0x",
+        "XXXXXXxxxx",
+    ], text: "Boxes such as the one below you can keep buttons down while you attend to your business. They can be picked up the same as turrets, as well as dropped or carried through portals", instruct: ""},
+    {map: [
+        "XXXXXXXXXX",
+        "x........X",
+        "x.....xxxX",
+        "x.#8..A.2X",
+        "Xaxx-xxxxX",
+        "xxx......X",
+        "x........X",
+        "x........X",
+        "X.......0X",
+        "xxxxXXXxxX"
+    ], text: "Well, you're fast. That was sarcasm. I had enough time to call two people you haven't seen in a long time.", instruct: "[S] or [down] to pick up and drop blocks"},
+    {map: [
+        "XXXXXXxxxxxXXXx",
+        "X.....Xxxx....x",
+        "X.....XXXx....x",
+        "X.....##.x....x",
+        "X..b.XxXxx....x",
+        "X..X...XXX....x",
+        "X..Xa..XXX...0x",
+        "X..xX..XXX...xx",
+        "X8.xX...BA...xx",
+        "XXXXXXXXXXXXXX"
+    ], text: "Please exercise caution. Replacing you would cost the company money and me the satisfaction of dealing with you myself.", instruct: ""},
+    {map: [
+        "xxxxxxXXXXXXXXXXXX",
+        "x8.....X.......XXX",
+        "xxx----X.......XXX",
+        "X..X....X......XXX",
+        "X......#A......XXX",
+        "X.....<XXXXXXX.XXX",
+        "X....#XXXXXXXX.XXX",
+        "X....XXXXX.....XXX",
+        "X.a.XXXXXX..b..B.X",
+        "XXXXXXXXXXXXXXXX.X",
+        "XXXXXXXXXXXXXXXX.X",
+        "X................X",
+        "X................X",
+        "X................X",
+        "X0...............X",
+        "XXXXXXXXXXXXXXXXXX"
+    ], text: "Now that the tutorial is over, the levels may become more challenging. Aperture Labs will continuously study your brainwaves and physical features throughout the process to help in the development of the portal gun.", instruct: ""},
+    {map: [
+        "xxxxXXXXXXX",
+        "x......A..X",
+        "x.xxxxx...X",
+        "x.xxxxx...X",
+        "x...#.x..aX",
+        "x..xX.|..XX",
+        "xxxxxxx...X",
+        "x.....x...X",
+        "x.....x...X",
+        "x0....B.8bX",
+        "xxxxxxxXXXX"
+    ], text: "...", instruct: ""},
+    {map: [
+        "XXXXXXXXXX",
+        "X........X",
+        "X........X",
+        "x........X",
+        "x..xa....X",
+        "x--xxx...X",
+        "xx1.#x..8X",
+        "Xxx.xx.XXX",
+        "XXx....A0x",
+        "XXXxxXXxxx"
+    ], text: "What sound do humans make when hitting the ground after a long drop? Is it a 'SPLAT' or a 'BOEING?'", instruct: "Don't press a key, and your character will not move."},
+    {map: [
+        "xxxxxxxxxx",
+        "xxxxx....X",
+        "x0.==....X",
+        "xxxxx....X",
+        "XXXXx..<.X",
+        "XXXXx.xxxX",
+        "XXXXx.xXXX",
+        "X..|..xXXX",
+        "X8.|..xXXX",
+        "XXXXXXXXXX"
+    ], text: "You might wonder the total cost of all this. No need to worry. Now that the Capitalist States of America are run by rich corporations such as Aperture, we can use all the American citizen's tax dollars without any worthwhile complaints from others.", instruct: ""},
+    {map: [
+        "xxxxxxxxxx",
+        "x........x",
+        "x........x",
+        "x........x",
+        "x.......0x",
+        "x##.....xx",
+        "XXX.....xX",
+        "X.......xX",
+        "X8.#####xX",
+        "XXXXXXXXXX"
+    ], text: "Have fun with that. This will be fun! I get to sit back and watch you complete a tedious task of stacking blocks. I wish they made virtual popcorn. I really do.", instruct: ""},
+    {map: [
+        "XXXXXXXXXXXXXXXXXXXXXXXXXXX",
+        "X.........................X",
+        "X........................0X",
+        "X......XXXXXXXXXXXXXXXXXXXX",
+        "X......C.......XXXXXXXXXXXX",
+        "X......XXXXXXxxxXXXXXXXXXXX",
+        "Xc.....B.......xXXXXXXXXXXX",
+        "XXb....XXXXXXx.xXXXXXXXXXXX",
+        "XXX8a..A.....x.xXXXXXXXXXXX",
+        "XXXXXXXXXXXXXx.xXXXXXXXXXXX",
+        "x.........................x",
+        "x.........................x",
+        "x.........................x",
+        "x.........................x",
+        "x.........................x",
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    ], text: "Which door will it be?\n\n(Shouldn't the blocks in level 27 be cubic?)", instruct: ""}
+];
+var level = 0;
+
+var Room = function() {
+    this.position = new PVector(0, 0);
+    this.shiftScreen = new PVector(0, 0);
+    this.needShiftScreen = new PVector(0, 0);
+    this.velocity = new PVector(0, 0);
+    this.facing = 0;
+    this.gravity = new PVector(0, 0.1);
+    this.boundary = new PVector(0, 0);
+    this.groundResistance = 0.93;
+    this.airResistance = 0.998;
+    this.initial = true;
+    this.switches = "abcdefghijklmnopqrstuvwyz";
+    this.tiles = [];
+    this.heights = [];
+    this.buttons = [];
+    this.boxes = [];
+    this.turrets = {list: [], bullets: []};
+    this.portals = {positions: [{x: undefined, y: undefined, rotate: 0}, {x: undefined, y: undefined, rotate: 0}], bullets: []};
+    this.platforms = [];
+    this.shooting = false;
+    this.portalShoot = 0;
+    this.carried = undefined;
+    this.transportingPortal = undefined;
+    this.flashes = [];
+    this.stillHeld = false;
+    this.door = {x: undefined, y: undefined, open: 0};
+    this.death = 0;
+    this.wrappedOpeningText = textWrap(levels[level].text, 300);
+    this.openingText = 20 + (textAscent() + textDescent())*1.35*split(this.wrappedOpeningText, "\n").length;
+    this.shootable = false;
+    this.rects = {
+        length: 5,
+        0: function(x, y, w, h) {
+            fill(200);
+            stroke(40);
+            strokeWeight(1);
+            rect(x, y, w, h);
+            rect(x + w/10, y + h/5, 8*w/10, 3*h/5, 2);
+            ellipse(x + 2 * w / 10, y + 1.5 * h / 5, 4, 4);
+            ellipse(x + 8 * w / 10, y + 1.5 * h / 5, 4, 4);
+            ellipse(x + 2 * w / 10, y + 3.5 * h / 5, 4, 4);
+            ellipse(x + 8 * w / 10, y + 3.5 * h / 5, 4, 4);
+        },
+        1: function(x, y, w, h) {
+            fill(200);
+            stroke(40);
+            strokeWeight(1);
+            rect(x, y, w, h);
+            rect(x + w/10, y + h/5, 8*w/10, 3*h/5, 2);
+            fill(255, 255, 0);
+            beginShape();
+            vertex(x + w/2, y + h/2 - 7);
+            vertex(x + w/2 - 3, y + h/2);
+            vertex(x + w/2, y + h/2 + 2);
+            vertex(x + w/2, y + h/2 + 7);
+            vertex(x + w/2 + 3, y + h/2);
+            vertex(x + w/2, y + h/2 - 2);
+            endShape(CLOSE);
+        },
+        2: function(x, y, w, h) {
+            fill(200);
+            stroke(40);
+            strokeWeight(1);
+            rect(x, y, w, h);
+        },
+        3: function(x, y, w, h) {
+            fill(200);
+            stroke(40);
+            strokeWeight(1);
+            rect(x, y, w, h);
+            strokeWeight(4);
+            point(x+w/4, y+h/5);
+            point(x+3*w/4, y+3*h/5);
+            point(x+w*2/4, y+h*4/5);
+            point(x+w/4, y+3*h/5);
+            strokeWeight(2);
+            stroke(135, 0, 0);
+            beginShape();
+            vertex(x+w/4, y+h/5);
+            bezierVertex(x+3*w/4, y+h/5, x+3*w/4, y+h/5, x+3*w/4, y+3*h/5);
+            endShape();
+            beginShape();
+            vertex(x+w*2/4, y+h*4/5);
+            bezierVertex(x+w/4, y+h*4/5, x+w/4, y+h*4/5, x+w/4, y+3*h/5);
+            endShape();
+        },
+        4: function(x, y, w, h) {
+            fill(200);
+            stroke(40);
+            strokeWeight(1);
+            rect(x, y, w, h);
+            strokeWeight(3);
+            stroke(132, 132, 132);
+            fill(80);
+            ellipse(x+w/2, y+h/2, w-10, h-10);
+            strokeWeight(4);
+            fill(180);
+            pushMatrix();
+            translate(x+w/2, y+h/2);
+            rotate(frameCount*15);
+            line(0, 0, 0, 10);
+            line(0, 0, 9, -5);
+            line(0, 0, -9, -5);
+            //arc(0, 5, 4, 15, -30, 210);
+            /*rotate(120);
+            arc(0, 5, 4, 15, -30, 210);
+            rotate(120);
+            arc(0, 5, 4, 15, -30, 210);*/
+            popMatrix();
+        },
+        dark: function(x, y, w, h) {
+            fill(150);
+            stroke(100);
+            strokeWeight(1);
+            rect(x, y, w, h);
+            /*stroke(112, 0, 0);
+            strokeWeight(5);
+            line(x + 4*w/10, y + 4*h/10, x + 6*w/10, y + 6*h/10);
+            line(x + 4*w/10, y + 6*h/10, x + 6*w/10, y + 4*h/10);*/
+        },
+        plasma: function(x, y, w, h, type) {
+            stroke(0, 242, 255, lag? 10: 100);
+            strokeCap(SQUARE);
+            if (type === 1) {
+                for (var i = 0; i < (lag? 10: 1); i++){
+                    strokeWeight(h - 2*i);
+                    line(x, y + h/2, x + w, y + h/2);
+                }
+            } else if (type === 0) {
+                for (var i = 0; i < (lag? 10: 1); i++){
+                    strokeWeight(w - 2*i);
+                    line(x + w/2, y, x + w/2, y + h);
+                }
+            }
+            strokeCap(ROUND);
+        },
+        button: function(x, y, pushed, c) {
+            noStroke();
+            fill(c);
+            rect(x+3, y+pushed, 24, 12, 3);
+            fill(100);
+            rect(x, y+10, 30, 7);
+        },
+        door: function(x, y, up, c) {
+            strokeWeight(1);
+            stroke(50);
+            fill(180);
+            rect(x, y - up, 40, 40, 6);
+            strokeWeight(4);
+            stroke(lerpColor(c, color(0), 0.3));
+            line(x+10, y+10 - up, x+10, y+30 - up);
+            line(x+20, y+10 - up, x+20, y+30 - up);
+            line(x+30, y+10 - up, x+30, y+30 - up);
+            strokeWeight(2);
+            stroke(c);
+            line(x+11, y+10 - up, x+11, y+30 - up);
+            line(x+21, y+10 - up, x+21, y+30 - up);
+            line(x+31, y+10 - up, x+31, y+30 - up);
+        },
+        box: function(x, y, w, h) {
+            strokeWeight(1);
+            stroke(100);
+            fill(180);
+            rect(x, y, w, h, 3);
+            fill(3, 34, 156);
+            noStroke();
+            triangle(x + w/10, y + h/10, x + 2*w/5, y + h/10, x + w/10, y + 2*h/5);
+            triangle(x + 9*w/10, y + h/10, x + 3*w/5, y + h/10, x + 9*w/10, y + 2*h/5);
+            triangle(x + w/10, y + 9*h/10, x + 2*w/5, y + 9*h/10, x + w/10, y + 3*h/5);
+            triangle(x + 9*w/10, y + 9*h/10, x + 3*w/5, y + 9*h/10, x + 9*w/10, y + 3*h/5);
+            stroke(3, 34, 156);
+            fill(255);
+            ellipse(x + w/2, y + w/2, w/2, h/2);
+        },
+        turret: function(x, y, t) {
+            strokeWeight(2);
+            stroke(100);
+            line(x + 3, y + 10, x + 1, y + 12);
+            line(x + 1, y + 12, x + 1, y + 18);
+            line(x + 10, y + 10, x + 12, y + 12);
+            line(x + 12, y + 12, x + 12, y + 18);
+            line(x + 6, y + 12, x + 6, y + 18);
+            strokeWeight(1);
+            stroke(100);
+            fill(180);
+            ellipse(x + 7, y + 7, 8, 12);
+            stroke(212, 0, 39);
+            fill(255);
+            ellipse(x + 3 + 7*t, y + 5, 2, 5);
+        },
+        zapper: function(x, y, on) {
+            if (on) {
+                noStroke();
+                fill(255, 0, 0, 20);
+                for (var n = 0; n < 10; n++) {
+                    rect(x, y+40 - n, 40, n);
+                    rect(x, y, 40, n);
+                }
+            }
+        },
+        exit: function(x, y, open) {
+            fill(51, 51, 51);
+            stroke(74, 74, 74);
+            strokeWeight(1);
+            rect(x+5, y+10, 25, 30);
+            fill(92, 92, 92);
+            rect(x+32, y+18, 6, 8);
+            noStroke();
+            fill(255);
+            triangle(x+35, y+18, x+32, y+22, x+38, y+22);
+            triangle(x+35, y+26, x+32, y+23, x+38, y+23);
+            stroke(74, 74, 74);
+            fill(140, 140, 140);
+            if (open < 30) {
+                for(var h = 0; h < floor((30 - open)/5); h++) {
+                    rect(x+5, y+10 + h*5 + (30 - open)%5, 25, 5);
+                }
+                if ((30 - open)%5 !== 0) {
+                    rect(x+5, y+10, 25, (30 - open)%5);
+                }
+            }
+            fill(74);
+            textSize(8);
+            text(level + 1, x+16, y + 9);
+        },
+        platform: function(x, y, opened, direction) {
+            if (direction === 0) {
+                strokeWeight(3);
+                stroke(0);
+                line(x+4, y+12, x+4+opened, y+28);
+                line(x+4, y+28, x+4+opened, y+12);
+                noStroke();
+                fill(100, 100, 100);
+                quad(x, y + 5, x + 4, y + 8, x + 4, y + 32, x, y + 35);
+                fill(150, 150, 150);
+                quad(x+4+opened, y+5, x+12+opened, y, x+12+opened, y+40, x+4+opened, y+35);
+            } else if (direction === 1) {
+                strokeWeight(3);
+                stroke(0);
+                line(x+36, y+12, x+36-opened, y+28);
+                line(x+36, y+28, x+36-opened, y+12);
+                noStroke();
+                fill(100, 100, 100);
+                quad(x+40, y + 5, x + 36, y + 8, x + 36, y + 32, x+40, y + 35);
+                fill(150, 150, 150);
+                quad(x+36-opened, y+5, x+28-opened, y, x+28-opened, y+40, x+36-opened, y+35);
+            }
+        }
+    };
+    this.portaled = false;
+};
+Room.prototype.create = function() {
+    if (this.initial) {
+        var total = 0;
+        var buttonTotal = 0;
+        for (var i = 0; i < levels[level].map.length; i++) {
+            var justSwitched = true;
+            for (var j = 0; j < levels[level].map[i].length; j++) {
+                if (levels[level].map[i][j] === "X") {
+                    total += 1;
+                    var num = random();
+                    if (num < 0.05 && lag) {
+                        num = 0;
+                    } else if (num < 0.1 && lag) {
+                        num = 1;
+                    } else if (num < 0.15 && lag) {
+                        num = 3;
+                    } else if (num < 0.2 && lag) {
+                        num = 4;
+                    } else {
+                        num = 2;
+                    }
+                    this.tiles.push({x: j*40, y: i*40, width: 40, height: 40, num: num, type: 0});
+                    if (justSwitched) {
+                        this.heights.push(total - 1);
+                        justSwitched = false;
+                    }
+                } else if (levels[level].map[i][j] === "x") {
+                    total += 1;
+                    this.tiles.push({x: j*40, y: i*40, width: 40, height: 40, type: 4});
+                    if (justSwitched) {
+                        this.heights.push(total - 1);
+                        justSwitched = false;
+                    }
+                } else if (levels[level].map[i][j] === "8") {
+                    this.position.x = j*40 + 10;
+                    this.position.y = i*40 + 5;
+                } else if (levels[level].map[i][j] === "0") {
+                    this.door.x = j*40;
+                    this.door.y = i*40;
+                } else if (levels[level].map[i][j] === "-") {
+                    total += 1;
+                    this.tiles.push({x: j*40, y: i*40 + 10, width: 40, height: 20, type: 5, num: 1});
+                    if (justSwitched) {
+                        this.heights.push(total - 1);
+                        justSwitched = false;
+                    }
+                } else if (levels[level].map[i][j] === "|") {
+                    total += 1;
+                    this.tiles.push({x: j*40 + 10, y: i*40, width: 20, height: 40, type: 5, num: 0});
+                    if (justSwitched) {
+                        this.heights.push(total - 1);
+                        justSwitched = false;
+                    }
+                } else if (levels[level].map[i][j] === "=") {
+                    total += 1;
+                    this.tiles.push({x: j*40, y: i*40, width: 40, height: 40, type: 7, num: 0});
+                    if (justSwitched) {
+                        this.heights.push(total - 1);
+                        justSwitched = false;
+                    }
+                } else if (levels[level].map[i][j] === "#") {
+                    total += 1;
+                    this.tiles.push({x: j*40 + 10, y: i*40 + 20, width: 20, height: 20, v: new PVector(0, 0), type: 3});
+                    this.boxes.push(total - 1);
+                } else if (levels[level].map[i][j] === "<") {
+                    total += 1;
+                    this.tiles.push({x: j*40 + 10, y: i*40 + 20, width: 13, height: 20, v: new PVector(0, 0), type: 6, facing: 0});
+                    this.turrets.list.push(total - 1);
+                    this.boxes.push(total - 1);
+                } else if (levels[level].map[i][j] === ">") {
+                    total += 1;
+                    this.tiles.push({x: j*40 + 10, y: i*40 + 20, width: 13, height: 20, v: new PVector(0, 0), type: 6, facing: 1});
+                    this.turrets.list.push(total - 1);
+                    this.boxes.push(total - 1);
+                } else if (levels[level].map[i][j] === "1") {
+                    total += 1;
+                    this.tiles.push({x: j*40, y: i*40, width: 12, height: 40, type: 8});
+                    this.platforms.push(total - 1);
+                    if (justSwitched) {
+                        this.heights.push(total - 1);
+                        justSwitched = false;
+                    }
+                } else if (levels[level].map[i][j] === "2") {
+                    total += 1;
+                    this.tiles.push({x: j*40, y: i*40, width: 12, height: 40, type: 9});
+                    this.platforms.push(total - 1);
+                    if (justSwitched) {
+                        this.heights.push(total - 1);
+                        justSwitched = false;
+                    }
+                } else if (split(this.switches, levels[level].map[i][j].toLowerCase()).length === 2 && levels[level].map[i][j] === levels[level].map[i][j].toLowerCase()) {
+                    buttonTotal += 1;
+                    total += 1;
+                    this.tiles.push({x: j*40+5, y: i*40 + 23, width: 30, height: 17, type: 1, pushed: 0, num: 0, coloring: color(random(50, 200), random(50, 200), random(50, 200)), push: false, unpush: [], bNum: buttonTotal-1});
+                    var found = false;
+                    for (var n in this.buttons) {
+                        if (this.buttons[n].letter === levels[level].map[i][j]) {
+                            this.buttons[n].b = total - 1;
+                            this.tiles[total - 1].coloring = this.tiles[this.buttons[n].d].coloring;
+                            found = true;
+                        }
+                    }
+                    if (!found) {
+                        this.buttons.push({b: total - 1, d: 0, letter: levels[level].map[i][j]});
+                    }
+                    if (justSwitched) {
+                        this.heights.push(this.tiles.length - 1);
+                        justSwitched = false;
+                    }
+                } else if (split(this.switches, levels[level].map[i][j].toLowerCase()).length === 2 && levels[level].map[i][j] === levels[level].map[i][j].toUpperCase()) {
+                    total += 1;
+                    this.tiles.push({x: j*40, y: i*40, width: 40, height: 40, type: 2, up: 0, num: 0, coloring: color(random(50, 200), random(50, 200), random(50, 200))});
+                    var found = false;
+                    for (var n in this.buttons) {
+                        if (this.buttons[n].letter === levels[level].map[i][j].toLowerCase()) {
+                            this.buttons[n].d = total - 1;
+                            this.tiles[total - 1].coloring = this.tiles[this.buttons[n].b].coloring;
+                            found = true;
+                        }
+                    }
+                    if (!found) {
+                        this.buttons.push({b: 0, d: total - 1, letter: levels[level].map[i][j].toLowerCase()});
+                    }
+                    if (justSwitched) {
+                        this.heights.push(this.tiles.length - 1);
+                        justSwitched = false;
+                    }
+                }
+            }
+        }
+        this.boundary.set(levels[level].map[0].length*40, levels[level].map.length*40);
+    }
+};
+Room.prototype.display = function() {
+    fill(0);
+    var num = constrain(floor((this.shiftScreen.y) / 40), 0, this.heights.length);
+    var j = this.heights[num];
+    for (var i = j; i < this.tiles.length; i++) {
+        if (this.tiles[i].x - this.shiftScreen.x > 405 && this.tiles[i].type !== 3 && this.tiles[i].type !== 6 && num !== levels[level].map.length - 1){
+            while (i > this.heights[num]) {
+                num += 1;
+            }
+            i = this.heights[num];
+        }
+        if (this.tiles[i].y > this.shiftScreen.y + 440 && this.tiles[i].type !== 3 && this.tiles[i].type !== 6){
+            i = this.tiles.length;
+        } else if (this.tiles[i].y - this.shiftScreen.y + this.tiles[i].height >= -5 && this.tiles[i].y - this.shiftScreen.y <= 405 && this.tiles[i].x - this.shiftScreen.x + this.tiles[i].width >= -5 && this.tiles[i].x - this.shiftScreen.x <= 405) {
+            if (this.tiles[i].type === 0) {
+                this.rects[this.tiles[i].num](this.tiles[i].x - this.shiftScreen.x, this.tiles[i].y - this.shiftScreen.y, this.tiles[i].width, this.tiles[i].height);
+            } else if (this.tiles[i].type === 1) {
+                this.rects.button(this.tiles[i].x - this.shiftScreen.x, this.tiles[i].y - this.shiftScreen.y, this.tiles[i].pushed, this.tiles[i].coloring);
+            } else if (this.tiles[i].type === 2) {
+                this.rects.door(this.tiles[i].x - this.shiftScreen.x, this.tiles[i].y - this.shiftScreen.y, this.tiles[i].up, this.tiles[i].coloring);
+            } else if (this.tiles[i].type === 4) {
+                this.rects.dark(this.tiles[i].x - this.shiftScreen.x, this.tiles[i].y - this.shiftScreen.y, this.tiles[i].width, this.tiles[i].height);
+            } else if (this.tiles[i].type === 5) {
+                this.rects.plasma(this.tiles[i].x - this.shiftScreen.x, this.tiles[i].y - this.shiftScreen.y, this.tiles[i].width, this.tiles[i].height, this.tiles[i].num);
+            } else if (this.tiles[i].type === 7) {
+                this.rects.zapper(this.tiles[i].x - this.shiftScreen.x, this.tiles[i].y - this.shiftScreen.y, floor(map(frameCount % 240, 0, 240, 0, 2)));
+            } else if (this.tiles[i].type === 8) {
+                this.rects.platform(this.tiles[i].x - this.shiftScreen.x, this.tiles[i].y - this.shiftScreen.y, this.tiles[i].width - 12, 0);
+            } else if (this.tiles[i].type === 9) {
+                this.rects.platform(this.tiles[i].x - this.shiftScreen.x, this.tiles[i].y - this.shiftScreen.y, this.tiles[i].width - 12, 1);
+            }
+        }
+    }
+    fill(158, 158, 158);
+    stroke(115, 115, 115);
+    strokeWeight(2);
+    this.rects.exit(this.door.x - this.shiftScreen.x, this.door.y - this.shiftScreen.y, this.door.open);
+    for (var i = 0; i < this.portals.positions.length; i++) {
+        stroke(i === 0? 255: 12, i === 0? 125: 176, i === 0? 0: 255);
+        strokeWeight(2);
+        fill(255);
+        if (this.portals.positions[1 - i].x === undefined) {
+            fill(i === 0? 255: 168, i === 0? 200: 242, i === 0? 125: 255);
+            //fill(12, 176, 201);
+        }
+        if (this.portals.positions[i].x !== undefined && this.portals.positions[i].rotate === 0) {
+            ellipse(this.portals.positions[i].x - this.shiftScreen.x, round(this.portals.positions[i].y/40)*40 - this.shiftScreen.y, 36, 10);
+            if (lag && this.portals.positions[1 - i].x !== undefined) {
+                noStroke();
+                for (var n = 0; n < 10; n++) {
+                    fill(i === 0? 255: 12, i === 0? 125: 176, i === 0? 0: 255, 40 - 3*n);
+                    ellipse(this.portals.positions[i].x - this.shiftScreen.x, round(this.portals.positions[i].y/40)*40 - this.shiftScreen.y + n*3*(levels[level].map[round(this.portals.positions[i].y/40)][floor(this.portals.positions[i].x / 40)] === "X"? -1: 1), 36, 10);
+                }
+            }
+        } else if (this.portals.positions[i].x !== undefined && this.portals.positions[i].rotate === 1) {
+            ellipse(round(this.portals.positions[i].x/40)*40 - this.shiftScreen.x, this.portals.positions[i].y - this.shiftScreen.y, 10, 36);
+            if (lag && this.portals.positions[1 - i].x !== undefined) {
+                noStroke();
+                for (var n = 0; n < 10; n++) {
+                    fill(i === 0? 255: 12, i === 0? 125: 176, i === 0? 0: 255, 40 - 3*n);
+                    ellipse(round(this.portals.positions[i].x/40)*40 - this.shiftScreen.x + n*3*(levels[level].map[floor(this.portals.positions[i].y / 40)][round(this.portals.positions[i].x/40)] === "X"? -1: 1), this.portals.positions[i].y - this.shiftScreen.y, 10, 36);
+                }
+            }
+        }
+    }
+    for (var i = 0; i < this.boxes.length; i++) {
+        if (this.tiles[this.boxes[i]].type === 3) {
+            this.rects.box(this.tiles[this.boxes[i]].x - this.shiftScreen.x, this.tiles[this.boxes[i]].y - this.shiftScreen.y, this.tiles[this.boxes[i]].width, this.tiles[this.boxes[i]].height);
+        } else if (this.tiles[this.boxes[i]].type === 6) {
+            this.rects.turret(this.tiles[this.boxes[i]].x - this.shiftScreen.x, this.tiles[this.boxes[i]].y - this.shiftScreen.y, this.tiles[this.boxes[i]].facing);
+        }
+    }
+    for (var i in this.portals.bullets) {
+        var kind = this.portals.bullets[i].type;
+        fill(kind === 0? 255: 0, kind === 0? 125: 250, kind === 1? 255: 0);
+        noStroke();
+        ellipse(this.portals.bullets[i].pos.x - this.shiftScreen.x + 5, this.portals.bullets[i].pos.y - this.shiftScreen.y + 5, 10, 10);
+    }
+    for (var i in this.turrets.bullets) {
+        fill(255, 0, 0);
+        noStroke();
+        ellipse(this.turrets.bullets[i].pos.x - this.shiftScreen.x + 2, this.turrets.bullets[i].pos.y - this.shiftScreen.y + 2, 4, 4);
+    }
+    noStroke();
+    fill(255, 0, 0);
+    strokeWeight(1);
+    stroke(200, 0, 0);
+    this.initial = false;
+    chell(this.position.x - this.shiftScreen.x, this.position.y - this.shiftScreen.y, this.facing, 20, 20);
+    noStroke();
+    for (var i = 0; i < this.flashes.length; i++) {
+        fill(red(this.flashes[i].color), green(this.flashes[i].color), blue(this.flashes[i].color), 255 - this.flashes[i].grow);
+        ellipse(this.flashes[i].x - this.shiftScreen.x, this.flashes[i].y - this.shiftScreen.y, this.flashes[i].grow/2 + 30, this.flashes[i].grow/2 + 30);
+        this.flashes[i].grow += this.flashes[i].grow / 10 + 5;
+        if (this.flashes[i].grow > 250) {
+            this.flashes.splice(i, 1);
+        }
+    }
+    
+    
+    textSize(9);
+    fill(0, 0, 0, 150);
+    rect(0, 0, 340, levels[level].text !== ""? constrain(this.openingText, 0, 20 + (textAscent() + textDescent())*1.35*split(this.wrappedOpeningText, "\n").length): 0);
+    rect(0, 40 + (textAscent() + textDescent())*1.35*split(this.wrappedOpeningText, "\n").length, levels[level].instruct !== ""? textWidth(levels[level].instruct)+20 + constrain(this.openingText,-textWidth(levels[level].instruct) - 20, 0): 0, 14);
+    fill(255);
+    text(levels[level].text, 10, -(textAscent() + textDescent())*1.35*split(this.wrappedOpeningText, "\n").length + this.openingText - 10, 300, Infinity);
+    text(levels[level].instruct, 10 + constrain(this.openingText, -textWidth(levels[level].instruct) - 20, 0), 48 + (textAscent() + textDescent())*1.35*split(this.wrappedOpeningText, "\n").length);
+    fill(199, 0, 30, constrain(this.death, 0, 150));
+    noStroke();
+    rect(0, 0, width, height);
+    //fill(0, 0, 0, nextLevel);
+    //rect(0, 0, width, height);
+};
+Room.prototype.update = function() {
+    this.turreting();
+    //frameRate(1);
+    var buttons = [];
+    for (var i = 0; i < this.buttons.length; i++) {
+        buttons.push(this.tiles[this.buttons[i].b]);
+        //this.tiles[this.buttons[i].b]
+        buttons[i].collection = [];
+    }
+    if (keys[RIGHT]) {
+        this.facing = 1;
+    } else if (keys[LEFT]) {
+        this.facing = -1;
+    } else {
+        this.facing = 0;
+    }
+    if ((keys[68] || keys[RIGHT]) && this.velocity.x < 1.5) {
+        this.velocity.x += 0.15;
+    } else if ((keys[65] || keys[LEFT]) && this.velocity.x > -1.5) {
+        this.velocity.x -= 0.15;
+    }
+    if (this.stillHeld && !keys[83] && !keys[DOWN]) {
+        this.stillHeld = false;
+    }
+    if ((keys[10] && this.openingText === 20 + (textAscent() + textDescent())*1.35*split(this.wrappedOpeningText, "\n").length) || (this.openingText !== 20 + (textAscent() + textDescent())*1.35*split(this.wrappedOpeningText, "\n").length) && this.openingText > -textWidth(levels[level].instruct) - 20) {
+        this.openingText -= 4;
+    }
+    this.portaling();
+    if (!mouseIsPressed) {
+        this.shootable = true;
+    }
+    this.velocity.add(this.gravity);
+    this.velocity.x = constrain(this.velocity.x, -5, 5);
+    this.velocity.y = constrain(this.velocity.y, -7, 7);
+    this.position.add(this.velocity);
+    this.exit();
+    var hit = this.collisions(this.position, this.velocity, 20, 20, buttons, true, false, false);
+    if (hit.down) {
+        this.velocity.x *= this.groundResistance;
+    } else {
+        this.velocity.mult(this.airResistance);
+    }
+    this.death += hit.death;
+    if (hit.transport !== undefined && this.portals.positions[hit.transport].x !== undefined) {
+        var portal = this.portals.positions[hit.transport];
+        var y = floor(portal.y / 40 - 0.01);
+        var x = floor(portal.x / 40 - 0.01);
+        //this.portaled = true;
+        if (this.carried !== undefined/* && this.transportingPortal === undefined*/) {
+            this.transportingPortal = 1 - hit.transport;
+        }
+        this.flashes.push({x: this.portals.positions[1 - hit.transport].x, y: this.portals.positions[1 - hit.transport].y, grow: 0, color: color(255*hit.transport, 255 - 125*hit.transport, 255 - 255*hit.transport)});
+        if (!portal.rotate && levels[level].map[y+1][x] === "X") {
+            this.position.x = portal.x - 10;
+            this.position.y = round(portal.y/40)*40 - 26;
+            this.velocity.y = -this.velocity.mag() - 0.2;
+            this.velocity.x = 0;
+            //this.transportingPortal = 1 - hit.transport;
+        } else if (!portal.rotate && levels[level].map[y][x] === "X") {
+            this.position.x = portal.x - 10;
+            this.position.y = round(portal.y/40)*40 + 6;
+            this.velocity.y = this.velocity.mag() + 0.2;
+            this.velocity.x = 0;
+            //this.transportingPortal = 1 - hit.transport;
+        } else if (portal.rotate && split("X12", levels[level].map[y][x+1]).length === 2) {
+            this.position.x = round(portal.x/40)*40 - 26;
+            this.position.y = portal.y - 10;
+            this.velocity.x = -this.velocity.mag() - 0.2;
+            this.velocity.y = 0;
+            //this.transportingPortal = 1 - hit.transport;
+        } else if (portal.rotate && split("X12", levels[level].map[y][x]).length === 2) {
+            this.position.x = round(portal.x/40)*40 + 6;
+            this.position.y = portal.y - 10;
+            this.velocity.x = this.velocity.mag() + 0.2;
+            this.velocity.y = 0;
+            //this.transportingPortal = 1 - hit.transport;
+        }
+        this.flashes.push({x: this.position.x + 10, y: this.position.y + 10, grow: 0, color: color(255 - 255*hit.transport, 125 + 125*hit.transport, 255*hit.transport)});
+    }
+    if ((keys[87] || keys[UP]) && hit.down && !hit.up) {
+        this.velocity.y = -2.2;
+        this.position.y += this.velocity.y;
+        hit = this.collisions(this.position, this.velocity, 20, 20, buttons, true, false, false);
+    }
+    if (hit.down && (hit.transport === undefined? true: this.portals.positions[hit.transport].x === undefined)) {
+        this.position.y -= abs(this.velocity.y);
+        this.velocity.y *= -0.5;
+    }
+    if (hit.up) {
+        //while (0) {
+            this.position.y -= -abs(this.velocity.y);
+        //}
+        this.velocity.y *= -1;
+    }
+    if (hit.left && (hit.transport === undefined? true: this.portals.positions[hit.transport].x === undefined)) {
+        this.position.x -= this.velocity.x - 0.1 ;
+        this.velocity.x *= -0.3;
+    }
+    if (hit.right && (hit.transport === undefined? true: this.portals.positions[hit.transport].x === undefined)) {
+        this.position.x -= this.velocity.x + 0.1 ;
+        this.velocity.x *= -0.3;
+    }
+    if (this.carried !== undefined) {
+        this.spring(this.carried, this.transportingPortal? this.portals.positions[this.transportingPortal]: this.portals.positions[0]);
+        if ((keys[83] || keys[DOWN]) && !this.stillHeld) {
+            this.carried = undefined;
+            this.transportingPortal = undefined;
+        }
+    }
+    for (var j = 0; j < this.boxes.length; j++) {
+        //if (this.tiles[this.boxes[j]].x - this.shiftScreen.x + this.tiles[this.boxes[j]].width > -80 && this.tiles[this.boxes[j]].x - this.shiftScreen.x < 480 && this.tiles[this.boxes[j]].y - this.shiftScreen.y + this.tiles[this.boxes[j]].height > -80 && this.tiles[this.boxes[j]].y - this.shiftScreen.y < 480) {
+            this.tiles[this.boxes[j]].v.add(this.gravity);
+            this.tiles[this.boxes[j]].v.x = constrain(this.tiles[this.boxes[j]].v.x, -2, 2)*this.airResistance;
+            this.tiles[this.boxes[j]].v.y = constrain(this.tiles[this.boxes[j]].v.y, -2, 2)*this.airResistance;
+            this.tiles[this.boxes[j]].x += this.tiles[this.boxes[j]].v.x;
+            this.tiles[this.boxes[j]].y += this.tiles[this.boxes[j]].v.y;
+            hit = this.collisions(this.tiles[this.boxes[j]], this.tiles[this.boxes[j]].v, this.tiles[this.boxes[j]].width, this.tiles[this.boxes[j]].height, buttons, false, false);
+            if (hit.transport !== undefined && this.portals.positions[hit.transport].x !== undefined) {
+                var portal = this.portals.positions[hit.transport];
+                var y = floor(portal.y / 40);
+                var x = floor(portal.x / 40);
+                //this.portaled = true;
+                this.transportingPortal = undefined;
+                this.flashes.push({x: this.portals.positions[1 - hit.transport].x, y: this.portals.positions[1 - hit.transport].y, grow: 0, color: color(255*hit.transport, 255 - 125*hit.transport, 255 - 255*hit.transport)});
+                if (!portal.rotate && levels[level].map[y+1][x] === "X") {
+                    this.tiles[this.boxes[j]].x = portal.x - 10;
+                    this.tiles[this.boxes[j]].y = round(portal.y/40)*40 - 28;
+                    this.tiles[this.boxes[j]].v.y = -abs(this.velocity.mag()) - 2;
+                    this.tiles[this.boxes[j]].v.x = 0;
+                } else if (!portal.rotate && levels[level].map[y][x] === "X") {
+                    this.tiles[this.boxes[j]].x = portal.x - 10;
+                    this.tiles[this.boxes[j]].y = round(portal.y/40)*40 + 8;
+                    this.tiles[this.boxes[j]].v.y = this.velocity.mag() + 2;
+                    this.tiles[this.boxes[j]].v.x = 0;
+                } else if (portal.rotate && split("X12", levels[level].map[y][x+1]).length === 2) {
+                    this.tiles[this.boxes[j]].x = round(portal.x/40)*40 - 28;
+                    this.tiles[this.boxes[j]].y = portal.y - 10;
+                    this.tiles[this.boxes[j]].v.x = -this.velocity.mag() - 2;
+                    this.tiles[this.boxes[j]].v.y = 0;
+                } else if (portal.rotate && split("X12", levels[level].map[y][x]).length === 2) {
+                    this.tiles[this.boxes[j]].x = round(portal.x/40)*40 + 8;
+                    this.tiles[this.boxes[j]].y = portal.y - 10;
+                    this.tiles[this.boxes[j]].v.x = this.velocity.mag() + 2;
+                    this.tiles[this.boxes[j]].v.y = 0;
+                }
+                this.flashes.push({x: this.tiles[this.boxes[j]].x + 10, y: this.tiles[this.boxes[j]].y + 10, grow: 0, color: color(255 - 255*hit.transport, 125 + 125*hit.transport, 255*hit.transport)});
+            }
+                
+            if (hit.down) {
+                this.tiles[this.boxes[j]].y -= abs(this.tiles[this.boxes[j]].v.y);
+                this.tiles[this.boxes[j]].v.y *= -0.1;
+            } else if (hit.up) {
+                this.tiles[this.boxes[j]].y += abs(this.tiles[this.boxes[j]].v.y);
+                this.tiles[this.boxes[j]].v.y *= -0.1;
+            }
+            if (hit.right) {
+                this.tiles[this.boxes[j]].x -= abs(this.tiles[this.boxes[j]].v.x);
+                this.tiles[this.boxes[j]].v.x *= -0.3;
+            } else if (hit.left) {
+                this.tiles[this.boxes[j]].x += abs(this.tiles[this.boxes[j]].v.x);
+                this.tiles[this.boxes[j]].v.x *= -0.3;
+            }
+        //}
+    }
+    for (var i = 0; i < this.buttons.length; i++) {
+        if(this.tiles[this.buttons[i].b].pushed >= 1 && this.tiles[this.buttons[i].d].up < 40) {
+            this.tiles[this.buttons[i].d].up += 2;
+        } else if (this.tiles[this.buttons[i].d].up > 0 && this.tiles[this.buttons[i].b].pushed < 1) {
+            this.tiles[this.buttons[i].d].up -= 2;
+        }
+        var pushed = false;
+        for (var j = 0; j < buttons[i].collection.length; j++) {
+            if (buttons[i].collection[j]) {
+                pushed = true;
+            }
+        }
+        this.tiles[this.buttons[i].b].push = pushed;
+    }
+    for (var i = 0; i < this.platforms.length; i++) {
+        if ((dist(this.tiles[this.platforms[i]].x, this.tiles[this.platforms[i]].y, this.position.x, this.position.y) < 100 || this.tiles[this.platforms[i]].width > 12) && this.tiles[this.platforms[i]].width < 40) {
+            this.tiles[this.platforms[i]].width += 2;
+        }
+    }
+    this.needShiftScreen.x = constrain(this.position.x - 220 + mouseX / 10, 0, this.boundary.x - 400);
+    this.needShiftScreen.y = constrain(this.position.y - 220 + mouseY / 10, 0, this.boundary.y - 400);
+    this.shiftScreen.x += (this.needShiftScreen.x > this.shiftScreen.x - 1? (this.needShiftScreen.x - this.shiftScreen.x) / 20: 0) + (this.needShiftScreen.x < this.shiftScreen.x + 1? (this.needShiftScreen.x - this.shiftScreen.x) / 20: 0);
+    this.shiftScreen.y += (this.needShiftScreen.y > this.shiftScreen.y - 1? (this.needShiftScreen.y - this.shiftScreen.y) / 20: 0) + (this.needShiftScreen.y < this.shiftScreen.y + 1? (this.needShiftScreen.y - this.shiftScreen.y) / 20: 0);
+    if (this.position.y > levels[level].map.length * 40) {
+        this.death += 20;
+    }
+    this.death -= this.death>0? 0.5: 0;
+};
+Room.prototype.spring = function(box, portal) {
+    this.anchor = new PVector(portal.x - this.shiftScreen.x, portal.y - this.shiftScreen.y);
+    if (this.transportingPortal === undefined) {
+        this.anchor = new PVector(this.position.x + 10 - this.shiftScreen.x, this.position.y - this.shiftScreen.y + 10);
+    }
+    var position = new PVector(this.tiles[box].x + 10 - this.shiftScreen.x, this.tiles[box].y + 10 - this.shiftScreen.y);
+    this.acceleration = new PVector(0, 0);
+    this.restLength = this.transportingPortal !== undefined? -2: 30;
+    this.k = 0.5;
+    this.damping = 0.99;
+    this.mass = 24;
+    /****************************************/
+    var dis = PVector.sub(position, this.anchor);
+    var d = dis.mag();
+    if (d < 28 && this.transportingPortal === undefined) {
+        dis.normalize();
+        dis.mult(28);
+        position = PVector.add(this.anchor, dis);
+        this.tiles[box].v.set((position.x - this.anchor.x)/20, (position.y - this.anchor.y)/20);}
+    this.tiles[box].v.sub(this.gravity);
+    var force = PVector.sub(this.anchor, position);
+    var currentLength = force.mag();
+    var x = this.restLength - currentLength;
+    force.normalize();
+    force.mult(-1 * this.k * x);
+    force.div(this.mass);
+    this.acceleration.add(force);
+    if (this.transportingPortal === undefined) {
+        var mouse = {x: constrain(mouseX - this.anchor.x, -1, 1), y: constrain(mouseY - this.anchor.y, -1, 1)};
+        force = new PVector(mouse.x, mouse.y);
+        force.div(this.mass);
+        this.acceleration.add(force);
+    }
+    this.tiles[box].v.add(this.acceleration);
+    this.tiles[box].v.mult(this.damping);
+};
+Room.prototype.collisions = function(position, velocity, width, height, buttons, main, bullet, turretB) {
+    //var returned = [false, false, false, false];
+    var returned = {right: false, left: false, up: false, down: false, placePortal: false, transport: undefined, death: 0};
+    var num = constrain(floor(position.y / 40) - 3, 0, this.heights.length);
+    var j = this.heights[num];
+    for (var i = j; i < this.tiles.length; i++) {
+        while ((this.tiles[i].type === 3 || this.tiles[i].type === 6) && i !== this.tiles.length - 1) {
+            i += 1;
+        }
+        if (this.tiles[i].y > position.y + 120 && this.tiles[i].type !== 3 && this.tiles[i].type !== 6){
+            i = this.tiles.length;
+        } else {
+            if (this.tiles[i].type === 1 && !bullet) {
+                //this.tiles[i].unpush.push(true);
+                buttons[this.tiles[i].bNum].collection.push(false);
+            }
+            var offset1 = (this.tiles[i].type === 2? this.tiles[i].up: 0);
+            if (position.x + width + 1 >= this.tiles[i].x && position.x + width - 5 <= this.tiles[i].x && velocity.x > 0 && position.y + height - 1 > this.tiles[i].y - offset1 && position.y < this.tiles[i].y - offset1 + this.tiles[i].height - 1) {
+                if ((bullet? this.tiles[i].type !== 5: true) && this.tiles[i].type !== 7) {
+                    returned.right = true;
+                } else if (this.tiles[i].type === 7 && main && floor(map(frameCount % 240, 0, 240, 0, 2))) {
+                    returned.death = 20;
+                }
+                if (bullet && this.tiles[i].type !== 1) {
+                    returned.placePortal = true;
+                }
+            } else if (position.x - 1 <= this.tiles[i].x + this.tiles[i].width && position.x >= this.tiles[i].x + this.tiles[i].width - 5 && velocity.x < 0 && position.y + height - 1 > this.tiles[i].y - offset1 && position.y < this.tiles[i].y - offset1 + this.tiles[i].height - 1) {
+                if ((bullet? this.tiles[i].type !== 5: true) && this.tiles[i].type !== 7) {
+                    returned.left = true;
+                } else if (this.tiles[i].type === 7 && main && floor(map(frameCount % 240, 0, 240, 0, 2))) {
+                    returned.death = 20;
+                }
+                if (bullet && this.tiles[i].type !== 1) {
+                    returned.placePortal = true;
+                }
+            }
+            var offset2 = (this.tiles[i].type === 1? this.tiles[i].pushed: 0);
+            if (position.y <= this.tiles[i].y + 5 - offset1 && position.y + height >= this.tiles[i].y + offset2 - offset1 && position.x < this.tiles[i].x + this.tiles[i].width - 1 && position.x + width - 1 > this.tiles[i].x && position !== this.tiles[i]) {
+                if ((bullet? this.tiles[i].type !== 5: true) && this.tiles[i].type !== 7) {
+                    returned.down = true;
+                } else if (this.tiles[i].type === 7 && main&& floor(map(frameCount % 240, 0, 240, 0, 2))) {
+                    returned.death = 20;
+                }
+                if (this.tiles[i].type === 1 && !bullet) {
+                    this.tiles[i].push = true;
+                    this.tiles[i].unpush[this.tiles[i].unpush.length - 1] = false;
+                    buttons[this.tiles[i].bNum].collection[buttons[this.tiles[i].bNum].collection.length - 1] = true;
+                    if (this.tiles[i].pushed < 8 && velocity.y > 0) {
+                        this.tiles[i].pushed += 2;
+                        position.y += 0.8;
+                    }
+                }
+                if (bullet && this.tiles[i].type !== 1) {
+                    returned.placePortal = true;
+                }
+            } else if (this.tiles[i].type === 1 && this.tiles[i].pushed > 0 && !this.tiles[i].push && !bullet) {
+                //frameRate(10);
+                this.tiles[i].pushed -= 1;
+                /*if (position.x + width + 1 > this.tiles[i].x && position.x + 1 < this.tiles[i].x + this.tiles[i].width && position.y + height > this.tiles[i].y + offset2 && position.y < this.tiles[i].y + 10) {
+                    position.y += 1;
+                }*/
+            }
+            if (position.y <= this.tiles[i].y + this.tiles[i].height - offset1 && position.y + height >= this.tiles[i].y + this.tiles[i].height - 5 + offset2 - offset1 && position.x < this.tiles[i].x + this.tiles[i].width - 1 && position.x + width - 1 > this.tiles[i].x && position !== this.tiles[i]) {
+                if ((bullet? this.tiles[i].type !== 5: true) && this.tiles[i].type !== 7) {
+                    returned.up = true;
+                } else if (this.tiles[i].type === 7 && main && floor(map(frameCount % 240, 0, 240, 0, 2))) {
+                    returned.death = 20;
+                }
+                if (bullet && this.tiles[i].type !== 1) {
+                    returned.placePortal = true;
+                }
+            }
+        }
+    }
+    if (turretB? true: !bullet) {
+        for (var i = 0; i < this.boxes.length; i++) {
+            var box = this.tiles[this.boxes[i]];
+                if (position.x + width >= box.x && position.x + width - 5 <= box.x && velocity.x > 0 && position.y + height - 1 > box.y && position.y < box.y + box.height - 1) {
+                    returned.right = true;
+                    if (main && (keys[83] || keys[DOWN])) {
+                        this.carried = this.boxes[i];
+                        this.stillHeld = true;
+                    }
+                } else if (position.x <= box.x + box.width && position.x >= box.x + box.width - 5 && velocity.x < 0 && position.y + height - 1 > box.y && position.y < box.y + box.height - 1) {
+                    returned.left = true;
+                    if (main && (keys[83] || keys[DOWN])) {
+                        this.carried = this.boxes[i];
+                        this.stillHeld = true;
+                    }
+                }
+                if (position.y + height <= box.y + 5 && position.y + height >= box.y && position.x < box.x + box.width - 1 && position.x + width - 1 > box.x && position !== box) {
+                    returned.down = true;
+                }
+                if (position.y <= box.y + box.height && position.y >= box.y + box.height - 5 && position.x < box.x + box.width - 1 && position.x + width - 1 > box.x && position !== box) {
+                    returned.up = true;
+                }
+        }
+    }
+    if (!main && (turretB? true: !bullet)) {
+        if (((position.x <= this.position.x + 20 && position.x >= this.position.x + 15 && velocity.x < 0) || (position.x + width >= this.position.x && position.x + width - 5 <= this.position.x && velocity.x > 0)) && position.y + height - 1 > this.position.y && position.y < this.position.y + 19) {
+            returned.right = true;
+            returned.left = true;
+            if (turretB) {
+                returned.death = 60;
+            }
+        }
+        if (((position.y <= this.position.y + 20 && position.y >= this.position.y + 15 && velocity.y < 0) || (position.y + height >= this.position.y && position.y + height - 5 <= this.position.y && velocity.y > 0)) && position.x + width - 1 > this.position.x && position.x < this.position.x + 19) {
+            returned.down = true;
+            returned.up = true;
+            if (turretB) {
+                returned.death = 60;
+            }
+        }
+    }
+    //if (main) {
+        for (var i = 0; i < this.portals.positions.length; i++) {
+            //var portal = {y: round(this.portals.positions[i].y/40)*40, x: round(this.portals.positions[i].x/40)*40};
+            var portal = this.portals.positions[i];
+            if (!portal.rotate && position.x < portal.x + 2 && position.x > portal.x - width - 2 && (round(this.portals.positions[i].y/40)*40 >= position.y? position.y >= round(portal.y/40)*40 - height - 6 && position.y <= round(portal.y/40)*40 - 10: position.y >= round(portal.y/40)*40 - 6 && position.y <= round(portal.y/40)*40 + 6)) {
+                returned.transport = 1 - i;
+            } else if (portal.rotate && (position.y < portal.y + 2 &&position.y > portal.y - height - 2) && (round(this.portals.positions[i].x/40)*40 >= position.x? position.x >= round(portal.x/40)*40 - width - 6 && position.x <= round(portal.x/40)*40 - 5: position.x >= round(portal.x/40)*40 - 6 && position.x <= round(portal.x/40)*40 + 6)) {
+                returned.transport = 1 - i;
+            }
+        }
+    //}
+    return returned;
+};
+Room.prototype.portaling = function() {
+    if (keys[70]) {
+        this.portals.positions = [{x: undefined, y: undefined, rotate: 0}, {x: undefined, y: undefined, rotate: 0}];
+    }
+    if (!this.shooting && (keys[81] || (mouseButton === LEFT && mouseIsPressed)) && this.shootable) {
+        this.shooting = true;
+        var v = new PVector(mouseX - this.position.x - 10 + this.shiftScreen.x, mouseY - this.position.y - 10 + this.shiftScreen.y);
+        v.normalize();
+        v.mult(5);
+        this.portals.bullets.push({pos: new PVector(this.position.x + 5, this.position.y + 5), v: v, type: 0});
+    } else if (!this.shooting && (keys[69] || (mouseButton === RIGHT && mouseIsPressed)) && this.shootable) {
+        this.shooting = true;
+        var v = new PVector(mouseX - this.position.x - 10 + this.shiftScreen.x, mouseY - this.position.y - 10 + this.shiftScreen.y);
+        v.normalize();
+        v.mult(5);
+        this.portals.bullets.push({pos: new PVector(this.position.x + 5, this.position.y + 5), v: v, type: 1});
+    } else if (!keys[81] && !keys[69] && !mouseIsPressed) {
+        this.shooting = false;
+    }
+    for (var i = this.portals.bullets.length - 1; i >= 0; i--) {
+        this.portals.bullets[i].pos.add(this.portals.bullets[i].v);
+        var hit = this.collisions(this.portals.bullets[i].pos, this.portals.bullets[i].v, 10, 10, [], false, true);
+        if (hit.up) {
+            var roundX = floor((this.portals.bullets[i].pos.x + 5) / 40);
+            var roundY = floor((this.portals.bullets[i].pos.y) / 40);
+            var x = this.portals.bullets[i].pos.x + 5;
+            var y = this.portals.bullets[i].pos.y;
+            var other = this.portals.positions[1 - this.portals.bullets[i].type];
+            if (hit.placePortal && (other.x !== undefined && other.rotate === 0 && floor(other.y / 40) === roundY? other.x < x - 32 || other.x > x + 32: true) && levels[level].map[roundY][roundX] === "X" && split(".#<>80", levels[level].map[roundY + 1][roundX]).length === 2 && (x + 15 > roundX * 40 + 40? levels[level].map[roundY][roundX + 1] === "X" && split(".#<>80", levels[level].map[roundY + 1][roundX + 1]).length === 2: true) && (x - 15 < roundX * 40? levels[level].map[roundY][roundX - 1] === "X" && split(".#<>80", levels[level].map[roundY + 1][roundX - 1]).length === 2: true)) {
+                this.portals.positions[this.portals.bullets[i].type].x = this.portals.bullets[i].pos.x + 5;
+                this.portals.positions[this.portals.bullets[i].type].y = this.portals.bullets[i].pos.y;
+                this.portals.positions[this.portals.bullets[i].type].rotate = 0;
+            }
+        }
+        if (hit.down) {
+            var roundX = floor((this.portals.bullets[i].pos.x + 5) / 40);
+            var roundY = floor((this.portals.bullets[i].pos.y) / 40) + 1;
+            var x = this.portals.bullets[i].pos.x + 5;
+            var y = this.portals.bullets[i].pos.y;
+            var other = this.portals.positions[1 - this.portals.bullets[i].type];
+            if (hit.placePortal && (other.x !== undefined && other.rotate === 0 && floor(other.y / 40) + 1 === roundY? other.x < x - 32 || other.x > x + 32: true) && levels[level].map[roundY][roundX] === "X" && split(".#<>80", levels[level].map[roundY - 1][roundX]).length === 2 && (x + 15 > roundX * 40 + 40? levels[level].map[roundY][roundX + 1] === "X" && split(".#<>80", levels[level].map[roundY - 1][roundX + 1]).length === 2: true) && (x - 15 < roundX * 40? levels[level].map[roundY][roundX - 1] === "X" && split(".#<>80", levels[level].map[roundY - 1][roundX - 1]).length === 2: true)) {
+                this.portals.positions[this.portals.bullets[i].type].x = this.portals.bullets[i].pos.x + 5;
+                this.portals.positions[this.portals.bullets[i].type].y = this.portals.bullets[i].pos.y;
+                this.portals.positions[this.portals.bullets[i].type].rotate = 0;
+            }
+        }
+        if (hit.right) {
+            var roundX = floor((this.portals.bullets[i].pos.x) / 40)+1;
+            var roundY = floor((this.portals.bullets[i].pos.y + 5) / 40);
+            var x = this.portals.bullets[i].pos.x;
+            var y = this.portals.bullets[i].pos.y + 5;
+            var other = this.portals.positions[1 - this.portals.bullets[i].type];
+            if (levels[level].map[roundY][roundX] === "2") {
+                for (var j = 0; j < this.platforms.length; j++) {
+                    if (this.tiles[this.platforms[j]].x === roundX * 40 && this.tiles[this.platforms[j]].y === roundY * 40 && this.tiles[this.platforms[j]].width >= 40) {
+                        this.portals.positions[this.portals.bullets[i].type].x = roundX * 40;
+                        this.portals.positions[this.portals.bullets[i].type].y = roundY * 40 + 20;
+                        this.portals.positions[this.portals.bullets[i].type].rotate = 1;
+                    }
+                }
+            }
+            if (hit.placePortal && (other.x !== undefined && other.rotate === 1 && floor(other.x / 40) + 1 === roundX? other.y < y - 32 || other.y > y + 32: true) && levels[level].map[roundY][roundX] === "X" && split(".#<>80", levels[level].map[roundY][roundX - 1]).length === 2 && (y + 15 > roundY * 40 + 40? levels[level].map[roundY + 1][roundX] === "X" && split(".#<>80", levels[level].map[roundY + 1][roundX - 1]).length === 2: true) && (y - 15 < roundY * 40? levels[level].map[roundY - 1][roundX] === "X" && split(".#<>80", levels[level].map[roundY - 1][roundX - 1]).length === 2: true)) {
+                this.portals.positions[this.portals.bullets[i].type].x = this.portals.bullets[i].pos.x;
+                this.portals.positions[this.portals.bullets[i].type].y = this.portals.bullets[i].pos.y + 5;
+                this.portals.positions[this.portals.bullets[i].type].rotate = 1;
+            }
+        }
+        if (hit.left) {
+            var roundX = floor((this.portals.bullets[i].pos.x) / 40);
+            var roundY = floor((this.portals.bullets[i].pos.y + 5) / 40);
+            var x = this.portals.bullets[i].pos.x;
+            var y = this.portals.bullets[i].pos.y + 5;
+            var other = this.portals.positions[1 - this.portals.bullets[i].type];
+            if (levels[level].map[roundY][roundX] === "1") {
+                for (var j = 0; j < this.platforms.length; j++) {
+                    if (this.tiles[this.platforms[j]].x === roundX * 40 && this.tiles[this.platforms[j]].y === roundY * 40 && this.tiles[this.platforms[j]].width >= 40) {
+                        this.portals.positions[this.portals.bullets[i].type].x = roundX * 40 + 40;
+                        this.portals.positions[this.portals.bullets[i].type].y = roundY * 40 + 20;
+                        this.portals.positions[this.portals.bullets[i].type].rotate = 1;
+                    }
+                }
+            }
+            if (hit.placePortal && (other.x !== undefined && other.rotate === 1 && floor(other.x / 40) === roundX? other.y < y - 32 || other.y > y + 32: true) && (levels[level].map[roundY][roundX] === "X") && split(".#<>80", levels[level].map[roundY][roundX + 1]).length === 2 && (y + 15 > roundY * 40 + 40? (levels[level].map[roundY + 1][roundX] === "X") && split(".#<>80", levels[level].map[roundY + 1][roundX + 1]).length === 2: true) && (y - 15 < roundY * 40? (levels[level].map[roundY - 1][roundX] === "X") && split(".#<>80", levels[level].map[roundY][roundX + 1]).length === 2: true)) {
+                this.portals.positions[this.portals.bullets[i].type].x = this.portals.bullets[i].pos.x;
+                this.portals.positions[this.portals.bullets[i].type].y = this.portals.bullets[i].pos.y + 5;
+                this.portals.positions[this.portals.bullets[i].type].rotate = 1;
+            }
+        }
+        if (hit.right || hit.left || hit.up || hit.down || this.portals.bullets[i].pos.x - this.shiftScreen.x < 0 || this.portals.bullets[i].pos.x - this.shiftScreen.x > 400 || this.portals.bullets[i].pos.y - this.shiftScreen.y < 0 || this.portals.bullets[i].pos.y - this.shiftScreen.y > 400) {
+            this.portals.bullets.splice(i, 1);
+        }
+    }
+};
+Room.prototype.turreting = function() {
+    for (var i = 0; i < this.turrets.list.length; i++) {
+        var turret = this.tiles[this.turrets.list[i]];
+        if (this.position.y < turret.y + turret.height + 10 && this.position.y + 30 > turret.y && (turret.facing === 0? this.position.x + 20 < turret.x: this.position.x + 20 > turret.x) && frameCount % 5 === 0) {
+            var v = new  PVector(-turret.x + this.position.x, -turret.y + this.position.y + random(-20, 20));
+            v.normalize();
+            v.mult(4);
+            this.turrets.bullets.push({pos: new PVector(turret.x + 2 + turret.facing*7, turret.y + 2), v: v});
+        }
+    }
+    for (var i = this.turrets.bullets.length - 1; i >= 0; i--) {
+        this.turrets.bullets[i].pos.add(this.turrets.bullets[i].v);
+        var hit = this.collisions(this.turrets.bullets[i].pos, this.turrets.bullets[i].v, 4, 4, [], false, true, true);
+        this.death += hit.death;
+        if (hit.up || hit.down || hit.right || hit.left) {
+            this.turrets.bullets.splice(i, 1);
+        }
+    }
+};
+Room.prototype.exit = function() {
+    if (this.position.x + 20 > this.door.x && this.position.x < this.door.x + 40 && this.position.y + 20 > this.door.y && this.position.y < this.door.y + 40 && this.door.open < 30) {
+        this.door.open += 1;
+    } else if (this.door.open > 0) {
+        this.door.open -= 1;
+    }
+    if (this.door.open >= 15 && nextLevel < 255) {
+        nextLevel += 5;
+    } else if (this.door.open < 15 && nextLevel > 1) {
+        nextLevel -= 10;
+    }
+};
+
+textSize(9);
+var room = new Room();
+room.create();
+
+var next = '';
+var time = 0;
+var endTime = 0;
+draw = function() {
+    background(255);
+    mill = millis();
+    cursor("NONE");
+    if (screen === 'game') {
+        image(Aperture, 200, 200, 200, 200);
+        textSize(9);
+        room.update();
+        room.display();
+        maxed = (millis() - mill) > maxed? millis() - mill: maxed;
+        text(maxed, 65, 10);
+        if (nextLevel >= 255 && room.death < 150 && !restart) {
+            if (level === levels.length - 1) {
+                screen = 'end';
+                endTime = millis() - time;
+            } else {
+                level += 1;
+                room = new Room();
+                room.create();
+            }
+        } else if (nextLevel >= 255 && room.death < 150 && restart) {
+            room = new Room();
+            room.create();
+            restart = false;
+        } else if ((room.death >= 150 || restart) && nextLevel < 255) {
+            nextLevel += 20;
+        } else if (room.death >= 150) {
+            room = new Room();
+            room.create();
+        }
+        if (keys[80]) {
+            restart = true;
+        }
+        textSize(15);
+        var s = "TIME ELAPSED: " + floor((millis() - time)/1000);
+        fill(0, 0, 0, 150);
+        rect(0, 380, textWidth(s)+8, 20);
+        fill(255);
+        text(s, 4, 395);
+    } else if (screen === 'menu') {
+        for (var x = 0; x < width; x += 40) {
+            for (var y = 0; y < height; y += 40) {
+                fill(200);
+                stroke(40);
+                rect(x, y, 40, 40);
+            }
+        }
+        chell(125, 220, 0, 150, 150);
+        strokeWeight(1);
+        fill(0);
+        image(Aperture, 100, 50, 80, 90);
+        textSize(100);
+        text("P RTAL", 10, 80);
+        textSize(20);
+        button(60, 130, "Start", function() {nextLevel=1;next='game';});
+        button(60, 160, "How To", function() {nextLevel=1;next='help';});
+        if (nextLevel > 0 && next !== '') {
+            nextLevel += 5;
+        } else if (nextLevel > 0) {
+            nextLevel -= 10;
+        }
+        if (nextLevel > 255) {
+            screen = next;
+            next = '';
+            time = millis();
+        }
+    } else if (screen === 'help') {
+        for (var x = 0; x < width; x += 40) {
+            for (var y = 0; y < height; y += 40) {
+                fill(200);
+                stroke(40);
+                rect(x, y, 40, 40);
+            }
+        }
+        strokeWeight(1);
+        fill(0);
+        image(Aperture, 100, 50, 80, 90);
+        textSize(100);
+        text("P RTAL", 10, 80);
+        fill(50, 50, 50, 200);
+        rect(29, 90, 342, 285, 6);
+        textSize(12);
+        fill(255);
+        text(textWrap("    Use the arrow keys or WAD to control the character. Right an Left clicks, or E and Q, will shoot portals in the direction of your cursor. The player must be manuvered through these portals to reach a door placed in every level. The F key will shut both of the portals simultaneously. The P key will restart the level. As you progress the levels increase in difficulty. New obstacles are constantly introduced. Turrets and boxes can be picked up when the player is directly next to them, and the S or Down keys are pressed. Some obstacles can cause serious, and even lethal amount of damage. I would say be careful, but I don't believe you can get through the game anyway.\n\n-GLaDOS", 302), 48, 110);
+        button(280, 362, "Back", function() {nextLevel=1;next='menu';});
+        if (nextLevel > 0 && next !== '') {
+            nextLevel += 5;
+        } else if (nextLevel > 0) {
+            nextLevel -= 10;
+        }
+        if (nextLevel > 255) {
+            screen = next;
+            next = '';
+        }
+    } else if (screen === 'end') {
+        image(Aperture, 200, 200, 200, 200);
+        noStroke();
+        fill(0, 0, 0, 230);
+        rect(-1, -1, width+1, height+1);
+        for (var i = 1; i < 20; i++) {
+            fill(255, 255, 255, i*2);
+            ellipse(width / 2, 350, 300 - i*10, 60 - 2*i);
+        }
+        fill(255);
+        textSize(30);
+        text("YOU BEAT GLaDOS!", 56, 50);
+        var s = "TOTAL TIME: " + floor(endTime/1000);
+        textSize(20);
+        text(s, 200 - textWidth(s)/2, 100);
+        textSize(15);
+        button(185, 386, "Menu", function() {nextLevel=1;next='menu';});
+        chell(175, 290, 0, 50, 50);
+        if (nextLevel > 0 && next !== '') {
+            nextLevel += 5;
+        } else if (nextLevel > 0) {
+            nextLevel -= 10;
+        }
+        if (nextLevel > 255) {
+            screen = next;
+            level = 0;
+            var room = new Room();
+            room.create();
+            next = '';
+        }
+    }
+    fill(0, 0, 0, nextLevel);
+    rect(0, 0, width, height);
+    image(mouse, mouseX, mouseY, 10, 10);
+    fill(0);
+    mouseDown = false;
+    //text(millis() - mill, 45, 10);
+};
+
